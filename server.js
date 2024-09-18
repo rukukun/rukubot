@@ -24,10 +24,8 @@ const GQL_ROUTE = 'https://7tv.io/v3/gql';
 const CHECK_EMOTE_ROUTE = 'https://7tv.io/v3/emotes/';
 const GET_EMOTE_SET_ROUTE = 'https://7tv.io/v3/emote-sets/'
 
-const emoteDbDefaultData = { emotes: [] };
-const requestDbDefaultData = { requests: [] };
-const emoteDb = await JSONFilePreset('emotedb.json', emoteDbDefaultData);
-const requestDb = await JSONFilePreset('requestdb.json', requestDbDefaultData);
+const defaultData = { emotes: [], requests: [], bannedUsers: [] };
+const db = await JSONFilePreset('db.json', defaultData);
 
 var modLock = false;
 
@@ -302,7 +300,7 @@ async function generateRequest(channel, user, message) {
         user: user,
         message: message
     }
-    await requestDb.update(({ requests }) => requests.push(newRequest));
+    await db.update(({ requests }) => requests.push(newRequest));
 }
 
 async function writeDatabase(requester, emoteId) {
@@ -314,7 +312,7 @@ async function writeDatabase(requester, emoteId) {
         expire: expire.toDate()
     }
     console.log(newEntry);
-    await emoteDb.update(({ emotes }) => emotes.push(newEntry));
+    await db.update(({ emotes }) => emotes.push(newEntry));
 }
 
 function isExpired(expire) {
@@ -322,17 +320,17 @@ function isExpired(expire) {
 }
 
 async function getExpiredEntries() {
-    return await emoteDb.data.emotes.filter((emote) => isExpired(emote.expire));
+    return await db.data.emotes.filter((emote) => isExpired(emote.expire));
 }
 
 async function removeEmotesFromDb(expiredEmoteIds) {
-    emoteDb.data.emotes = emoteDb.data.emotes.filter((emote) => !expiredEmoteIds.includes(emote.id))
-    await emoteDb.write();
+    db.data.emotes = db.data.emotes.filter((emote) => !expiredEmoteIds.includes(emote.id))
+    await db.write();
 }
 
 async function getUserEmoteCount(user) {
     var result = 0;
-    emoteDb.data.emotes.filter((emote) => emote.requester == user).forEach(() => result++);
+    db.data.emotes.filter((emote) => emote.requester == user).forEach(() => result++);
     return result;
 }
 
@@ -340,24 +338,29 @@ async function handleNextRequest() {
     if (modLock)
         return;
     modLock = true;
-    if (requestDb.data.requests.length > 0) {
-        var curRequest = requestDb.data.requests.at(0);
+    if (db.data.requests.length > 0) {
+        var curRequest = db.data.requests.at(0);
 
-        var curEmoteCount = await getUserEmoteCount(curRequest.user)
-        console.log("User " + curRequest.user + " currently has " + curEmoteCount + " active emotes.")
-        if (curEmoteCount >= emotesPerUser) {
-            client.say(curRequest.channel, `Sorry @${curRequest.user}, you cannot add any more emotes at this moment.`)
-            await handleRefund(curRequest);
-        } else {
-            client.say(channel, `One moment while I look for this emote @${curRequest.user}`)
-            const requestHandled = await handleRedeem(curRequest.channel, curRequest.user, curRequest.message);
-            if (!requestHandled) {
+        if (!db.data.bannedUsers.includes(curRequest.user.toLowerCase())) {
+            var curEmoteCount = await getUserEmoteCount(curRequest.user)
+            console.log("User " + curRequest.user + " currently has " + curEmoteCount + " active emotes.")
+            if (curEmoteCount >= emotesPerUser) {
+                client.say(curRequest.channel, `Sorry @${curRequest.user}, you cannot add any more emotes at this moment.`)
                 await handleRefund(curRequest);
+            } else {
+                client.say(curRequest.channel, `One moment while I look for this emote @${curRequest.user}`)
+                const requestHandled = await handleRedeem(curRequest.channel, curRequest.user, curRequest.message);
+                if (!requestHandled) {
+                    await handleRefund(curRequest);
+                }
             }
+        } else {
+            client.say(curRequest.channel, `Sorry, @${curRequest.user} , but you are not allowed to request emotes here.`)
+            await handleRefund(curRequest);
         }
 
-        requestDb.data.requests = requestDb.data.requests.filter((request) => request.id != curRequest.id);
-        await requestDb.write();
+        db.data.requests = db.data.requests.filter((request) => request.id != curRequest.id);
+        await db.write();
     }
     modLock = false;
 }
@@ -391,6 +394,37 @@ async function checkAndRemoveEmotes() {
     modLock = false;
 }
 
+function parseCommand(message) {
+    // Regular expression to match "!command param1 param2 param3" format
+    const regex = /^!(\w+)\s*(.*)/;
+
+    // Check if the message matches the pattern
+    const match = message.match(regex);
+
+    if (match) {
+        // "command" is in the first capture group
+        const command = match[1];
+
+        // "params" are in the second capture group, split by space
+        const params = match[2].trim() ? match[2].trim().split(/\s+/) : [];
+
+        return { command, params };
+    } else {
+        // If no match, return null
+        return null;
+    }
+}
+
+async function purgeUser(user) {
+    console.log("Getting bearer token..")
+    bearerToken = await getAuth(bearerToken);
+    for (const emote of db.data.emotes.filter((emote) => emote.requester.toLowerCase() == user)) {
+        await sendEmoteQuery(emote.emoteId, "REMOVE", "");
+    }
+    db.data.emotes = db.data.emotes.filter((emote) => emote.requester.toLowerCase() != user);
+    await db.write();
+}
+
 client.on('message', (channel, context, message, self) => {
     if (context.username != "therukukun")
         return;
@@ -398,6 +432,28 @@ client.on('message', (channel, context, message, self) => {
     if (rewardId == targetRewardId) {
         console.log(context);
         generateRequest(channel, context["display-name"], message);
+    } else if (context.mod) {
+        const command = parseCommand(message);
+        if (command) {
+            if (command.command == "rb" || command.command == "rukubot") {
+                try {
+                    if (command.params[0] == "purge") {
+                        console.log("removing all emotes from user " + command.params[1]);
+                        purgeUser(command.params[1]);
+                        client.say(channel, `@${context["display-name"]} removed all emotes requested by @${command.params[1]}`)
+                    } else if (command.params[0] == "ban") {
+                        db.update(({ bannedUsers }) => bannedUsers.push(command.params[1].toLowerCase()))
+                        client.say(channel, `@${context["display-name"]} banned user @${command.params[1]}`)
+                    } else if (command.params[0] == "unban") {
+                        db.data.bannedUsers = db.data.bannedUsers.filter((user) => user != command.params[1].toLowerCase());
+                        db.write();
+                        client.say(channel, `@${context["display-name"]} unbanned user @${command.params[1]}`)
+                    }
+                } catch (e) {
+                    console.log("Exception " + e);
+                }
+            }
+        }
     }
 });
 
