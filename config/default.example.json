@@ -2,5 +2,6 @@
     "channel": "your channel name",
     "rewardId": "the id of the reward",
     "emoteSetId": "the id of the emote set",
-    "emoteLifetime": "how long an emote should be kept enabled (int)"
+    "emoteLifetime": "how long an emote should be kept enabled (int)",
+    "maxEmotesPerUser": "how many emotes a single user can have active at a time (int)"
 }

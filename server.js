@@ -14,6 +14,7 @@ const channelName = config.get('channel');
 const targetRewardId = config.get('rewardId');
 const emoteSetid = config.get('emoteSetId');
 const emoteLifetime = config.get('emoteLifetime');
+const emotesPerUser = config.get('maxEmotesPerUser');
 var bearerToken = "";
 
 const AUTH_COOKIE_NAME = 'seventv-auth';
@@ -270,8 +271,7 @@ async function handleRedeem(channel, user, message) {
     // Check if the message matches the regex
     const match = message.match(regex);
 
-    if(match)
-    {
+    if (match) {
         id = match[1];
     } else {
         id = message;
@@ -285,15 +285,17 @@ async function handleRedeem(channel, user, message) {
         console.log("Emote added");
         return true;
     }
-    else if (enableResponse.code == 1 || enableResponse.code == 2)
-    {
+    else if (enableResponse.code == 1 || enableResponse.code == 2) {
         client.say(channel, enableResponse.msg)
         return false;
     }
 }
 
-async function generateRequest(channel, user, message)
-{
+async function handleRefund(request) {
+
+}
+
+async function generateRequest(channel, user, message) {
     const newRequest = {
         id: crypto.randomUUID(),
         channel: channel,
@@ -302,17 +304,6 @@ async function generateRequest(channel, user, message)
     }
     await requestDb.update(({ requests }) => requests.push(newRequest));
 }
-
-client.on('message', (channel, context, message, self) => {
-    if (context.username != "therukukun")
-        return;
-    const rewardId = context["custom-reward-id"]
-    if (rewardId == targetRewardId) {
-        console.log(context);
-        generateRequest(channel, context["display-name"], message);
-        //handleRedeem(channel, context["display-name"], message);
-    }
-});
 
 async function writeDatabase(requester, emoteId) {
     const expire = moment().add(emoteLifetime, "s");
@@ -339,20 +330,34 @@ async function removeEmotesFromDb(expiredEmoteIds) {
     await emoteDb.write();
 }
 
-async function handleNextRequest()
-{
-    if(modLock)
+async function getUserEmoteCount(user) {
+    var result = 0;
+    emoteDb.data.emotes.filter((emote) => emote.requester == user).forEach(() => result++);
+    return result;
+}
+
+async function handleNextRequest() {
+    if (modLock)
         return;
     modLock = true;
-    if(requestDb.data.requests.length > 0)
-    {
+    if (requestDb.data.requests.length > 0) {
         var curRequest = requestDb.data.requests.at(0);
-        const requestHandled = await handleRedeem(curRequest.channel, curRequest.user, curRequest.message);
-        if(requestHandled)
-        {
-            requestDb.data.requests = requestDb.data.requests.filter((request) => request.id != curRequest.id);
-            await requestDb.write();
+
+        var curEmoteCount = await getUserEmoteCount(curRequest.user)
+        console.log("User " + curRequest.user + " currently has " + curEmoteCount + " active emotes.")
+        if (curEmoteCount >= emotesPerUser) {
+            client.say(curRequest.channel, `Sorry @${curRequest.user}, you cannot add any more emotes at this moment.`)
+            await handleRefund(curRequest);
+        } else {
+            client.say(channel, `One moment while I look for this emote @${curRequest.user}`)
+            const requestHandled = await handleRedeem(curRequest.channel, curRequest.user, curRequest.message);
+            if (!requestHandled) {
+                await handleRefund(curRequest);
+            }
         }
+
+        requestDb.data.requests = requestDb.data.requests.filter((request) => request.id != curRequest.id);
+        await requestDb.write();
     }
     modLock = false;
 }
@@ -385,6 +390,16 @@ async function checkAndRemoveEmotes() {
     }
     modLock = false;
 }
+
+client.on('message', (channel, context, message, self) => {
+    if (context.username != "therukukun")
+        return;
+    const rewardId = context["custom-reward-id"]
+    if (rewardId == targetRewardId) {
+        console.log(context);
+        generateRequest(channel, context["display-name"], message);
+    }
+});
 
 setInterval(handleNextRequest, 500);
 setInterval(checkAndRemoveEmotes, 10000);
