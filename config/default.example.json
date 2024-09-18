@@ -1,0 +1,6 @@
+{
+    "channel": "your channel name",
+    "rewardId": "the id of the reward",
+    "emoteSetId": "the id of the emote set",
+    "emoteLifetime": "how long an emote should be kept enabled (int)"
+}
