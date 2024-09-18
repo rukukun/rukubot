@@ -308,8 +308,14 @@ async function handleRedeem(channel, user, message) {
 
 async function handleRefund(request) {
     var lastRedeem = await getLastRedemption(request.user);
-    await refundRedemption(lastRedeem.id);
+    await setRedemptionStatus(lastRedeem.id, "CANCELED");
     console.log("Refunded user " + request.user);
+}
+
+async function fulfillRedemption(request) {
+    var lastRedeem = await getLastRedemption(request.user);
+    await setRedemptionStatus(lastRedeem.id, "FULFILLED");
+    console.log("Fulfilled redemption for user " + request.user);
 }
 
 async function generateRequest(channel, user, message) {
@@ -371,6 +377,8 @@ async function handleNextRequest() {
                 const requestHandled = await handleRedeem(curRequest.channel, curRequest.user, curRequest.message);
                 if (!requestHandled) {
                     await handleRefund(curRequest);
+                } else {
+                    await fulfillRedemption(curRequest);
                 }
             }
         } else {
@@ -461,9 +469,9 @@ async function createReward() {
     )
 }
 
-async function refundRedemption(redemptionId) {
+async function setRedemptionStatus(redemptionId, newStatus) {
     var refundResult = await axios.patch(REDEMPTIONS_ROUTE, {
-        status: "CANCELED"
+        status: newStatus
     }, {
         headers: {
             "Client-Id": process.env.TWITCH_BROADCASTER_CLIENTID,
