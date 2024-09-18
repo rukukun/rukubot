@@ -228,20 +228,21 @@ async function enableEmote(id) {
     console.log(emoteExists);
     if (emoteExists.code == 1) {
         result.code = 1;
-        result.msg = "The emote with id " + id + " does not exist";
+        result.msg = "I couldn't find the emote " + id + " modCheck ";
         return result;
     }
 
     if (emoteExists.code == 2) {
         result.code = 2;
-        result.msg = "The emote with id " + id + " does exist, but is not listed publicly";
+        result.msg = "The emote with id " + id + " is not public FeelsCringeManW ";
         return result;
     }
 
     var emoteSearchResult = searchEmoteSetId(id);
     if (emoteSearchResult.code == 1) {
         result.code = 3;
-        result.msg = "We already have the emote " + emoteSearchResult.emote.name + " " + emoteSearchResult.emote.data.name + ", its called \"" + emoteSearchResult.emote.name + "\"";
+        //result.msg = "We already have " + emoteSearchResult.emote.name + " " + emoteSearchResult.emote.data.name + ", its called \"" + emoteSearchResult.emote.name + "\" Pepega ";
+        result.msg = emoteSearchResult.emote.name + " is called \"" + emoteSearchResult.emote.name + "\" here Pepega ";
         return result;
     }
 
@@ -253,7 +254,8 @@ async function enableEmote(id) {
 
     await sendEmoteQuery(id, "ADD", desiredEmoteName);
     result.code = 0;
-    result.msg = "Added emote \"" + desiredEmoteName + "\" " + desiredEmoteName;
+    //result.msg = "Added emote \"" + desiredEmoteName + "\" " + desiredEmoteName;
+    result.msg = " " + desiredEmoteName + " ";
     return result;
 }
 
@@ -370,10 +372,10 @@ async function handleNextRequest() {
             var curEmoteCount = await getUserEmoteCount(curRequest.user)
             console.log("User " + curRequest.user + " currently has " + curEmoteCount + " active emotes.")
             if (curEmoteCount >= emotesPerUser) {
-                client.say(curRequest.channel, `Sorry @${curRequest.user}, you cannot add any more emotes at this moment.`)
+                client.say(curRequest.channel, `You already added an emote @${curRequest.user} pepeReload `)
                 await handleRefund(curRequest);
             } else {
-                client.say(curRequest.channel, `One moment while I look for this emote @${curRequest.user}`)
+                client.say(curRequest.channel, `HACKERMANS beep boop @${curRequest.user}`)
                 const requestHandled = await handleRedeem(curRequest.channel, curRequest.user, curRequest.message);
                 if (!requestHandled) {
                     await handleRefund(curRequest);
@@ -382,7 +384,7 @@ async function handleNextRequest() {
                 }
             }
         } else {
-            client.say(curRequest.channel, `Sorry, @${curRequest.user} , but you are not allowed to request emotes here.`)
+            client.say(curRequest.channel, `You are banned from requesting emotes @${curRequest.user} PepeLoser `)
             await handleRefund(curRequest);
         }
 
