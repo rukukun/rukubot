@@ -15,6 +15,7 @@ const targetRewardId = config.get('rewardId');
 const emoteSetid = config.get('emoteSetId');
 const emoteLifetime = config.get('emoteLifetime');
 const emotesPerUser = config.get('maxEmotesPerUser');
+const broadcasterUserId = config.get('broadcasterUserId');
 var bearerToken = "";
 
 const AUTH_COOKIE_NAME = 'seventv-auth';
@@ -23,6 +24,8 @@ const LOGIN_ROUTE = 'https://7tv.io/v3/auth?platform=twitch';
 const GQL_ROUTE = 'https://7tv.io/v3/gql';
 const CHECK_EMOTE_ROUTE = 'https://7tv.io/v3/emotes/';
 const GET_EMOTE_SET_ROUTE = 'https://7tv.io/v3/emote-sets/'
+const REDEMPTIONS_ROUTE = 'https://api.twitch.tv/helix/channel_points/custom_rewards/redemptions'
+const TWITCH_USERS_ROUTE = 'https://api.twitch.tv/helix/users'
 
 const defaultData = { emotes: [], requests: [], bannedUsers: [] };
 const db = await JSONFilePreset('db.json', defaultData);
@@ -189,17 +192,23 @@ async function checkEmote(id) {
     const checkEmoteResponse = await axios.get(`${CHECK_EMOTE_ROUTE}${id}`,
         {
             validateStatus: function (status) {
-                return status == 400 || status == 200 || status == 304;
+                return status == 400 || status == 404 || status == 200 || status == 304;
             }
         }
     ).catch(function (error) {
         console.log(error);
     });
 
-    if (checkEmoteResponse.status == 400) {
+    if (checkEmoteResponse.status == 400 || checkEmoteResponse.status == 404) {
         result.code = 1;
         return result;
     }
+
+    if (checkEmoteResponse.data.listed == false) {
+        result.code = 2;
+        return result;
+    }
+
     result.code = 0;
     result.name = checkEmoteResponse.data.name;
     return result;
@@ -223,9 +232,15 @@ async function enableEmote(id) {
         return result;
     }
 
+    if (emoteExists.code == 2) {
+        result.code = 2;
+        result.msg = "The emote with id " + id + " does exist, but is not listed publicly";
+        return result;
+    }
+
     var emoteSearchResult = searchEmoteSetId(id);
     if (emoteSearchResult.code == 1) {
-        result.code = 2;
+        result.code = 3;
         result.msg = "We already have the emote " + emoteSearchResult.emote.name + " " + emoteSearchResult.emote.data.name + ", its called \"" + emoteSearchResult.emote.name + "\"";
         return result;
     }
@@ -246,16 +261,18 @@ async function enableEmote(id) {
 async function disableEmote(id) {
     var result = {};
 
-    var emoteSearchResult = searchEmoteSetId(id);
+    var emoteExists = await checkEmote(id);
+
+    /*var emoteSearchResult = searchEmoteSetId(id);
     if (emoteSearchResult.code == 0) {
         result.code = 1;
         result.msg = "Could not find emote with id " + id + " in emote set.";
         return result;
-    }
+    }*/
 
-    await sendEmoteQuery(id, "REMOVE", emoteSearchResult.emote.data.name);
+    await sendEmoteQuery(id, "REMOVE", emoteExists.name);
     result.code = 0;
-    result.msg = "Removed emote \"" + emoteSearchResult.emote.data.name + " with id " + id;
+    result.msg = "Removed emote \"" + emoteExists.name + " with id " + id;
     return result;
 }
 
@@ -283,14 +300,16 @@ async function handleRedeem(channel, user, message) {
         console.log("Emote added");
         return true;
     }
-    else if (enableResponse.code == 1 || enableResponse.code == 2) {
+    else if (enableResponse.code == 1 || enableResponse.code == 2 || enableResponse.code == 3) {
         client.say(channel, enableResponse.msg)
         return false;
     }
 }
 
 async function handleRefund(request) {
-
+    var lastRedeem = await getLastRedemption(request.user);
+    await refundRedemption(lastRedeem.id);
+    console.log("Refunded user " + request.user);
 }
 
 async function generateRequest(channel, user, message) {
@@ -418,21 +437,89 @@ function parseCommand(message) {
 async function purgeUser(user) {
     console.log("Getting bearer token..")
     bearerToken = await getAuth(bearerToken);
-    for (const emote of db.data.emotes.filter((emote) => emote.requester.toLowerCase() == user)) {
+    for (const emote of db.data.emotes.filter((emote) => emote.requester.toLowerCase() == user.toLowerCase())) {
         await sendEmoteQuery(emote.emoteId, "REMOVE", "");
     }
-    db.data.emotes = db.data.emotes.filter((emote) => emote.requester.toLowerCase() != user);
+    db.data.emotes = db.data.emotes.filter((emote) => emote.requester.toLowerCase() != user.toLowerCase());
     await db.write();
 }
 
+async function createReward() {
+    var result = await axios.post("https://api.twitch.tv/helix/channel_points/custom_rewards",
+        {
+            title: "Add Emote",
+            cost: 500
+        }, {
+        headers: {
+            "Client-Id": process.env.TWITCH_BROADCASTER_CLIENTID,
+            Authorization: `Bearer ${process.env.TWITCH_BROADCASTER_TOKEN}`
+        },
+        params: {
+            broadcaster_id: broadcasterUserId
+        }
+    }
+    )
+}
+
+async function refundRedemption(redemptionId) {
+    var refundResult = await axios.patch(REDEMPTIONS_ROUTE, {
+        status: "CANCELED"
+    }, {
+        headers: {
+            "Client-Id": process.env.TWITCH_BROADCASTER_CLIENTID,
+            Authorization: `Bearer ${process.env.TWITCH_BROADCASTER_TOKEN}`
+        },
+        params: {
+            id: redemptionId,
+            broadcaster_id: broadcasterUserId,
+            reward_id: targetRewardId
+        }
+    });
+    console.log(refundResult.data);
+}
+
+async function getLastRedemption(user) {
+    var result = {}
+    var redemptionsResult = await axios.get(REDEMPTIONS_ROUTE, {
+        headers: {
+            "Client-Id": process.env.TWITCH_BROADCASTER_CLIENTID,
+            Authorization: `Bearer ${process.env.TWITCH_BROADCASTER_TOKEN}`
+        },
+        params: {
+            broadcaster_id: broadcasterUserId,
+            reward_id: targetRewardId,
+            status: "UNFULFILLED",
+            sort: "NEWEST"
+        }
+    });
+    if (!redemptionsResult.data || !redemptionsResult.data.data || !redemptionsResult.data.data[0]) {
+        result.code = 1;
+        result.msg = "No redemptions found";
+        return result;
+    }
+
+    for (const entry of redemptionsResult.data.data) {
+        if (entry.user_name.toLowerCase() != user.toLowerCase())
+            continue;
+        result.id = entry.id;
+        result.code = 0;
+    }
+
+    if (result.code != 0) {
+        result.code = 2;
+        result.msg = "No redemption found for " + user
+        return result;
+    }
+
+    return result;
+}
+
 client.on('message', (channel, context, message, self) => {
-    if (context.username != "therukukun")
-        return;
     const rewardId = context["custom-reward-id"]
     if (rewardId == targetRewardId) {
         console.log(context);
         generateRequest(channel, context["display-name"], message);
-    } else if (context.mod) {
+    } else if (context.mod || context.username == channelName) {
         const command = parseCommand(message);
         if (command) {
             if (command.command == "rb" || command.command == "rukubot") {
