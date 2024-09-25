@@ -30,10 +30,11 @@ The bot will listen to a couple commands;
 ## Setup
 
  1. Clone the repository to target directory
- 2. Configure your `.env` and `./config/default.json` configuration files
- 3. Run the command `!rb createdefaultreward`
- 4. Insert the ID of the newly created reward into the config file
- 5. Run the bot (Recommend using pm2) 
+ 2. Run `npm install` to get the required dependencies.
+ 3. Configure your `.env` and `./config/default.json` configuration files
+ 4. Run the command `!rb createdefaultreward`
+ 5. Insert the ID of the newly created reward into the config file
+ 6. Run the bot (Recommend using pm2) 
  `pm2 start rukubot.js`
 
 ### Issues
