@@ -4,5 +4,14 @@
     "rewardId": "the id of the reward",
     "emoteSetId": "the id of the emote set",
     "emoteLifetime": "how long an emote should be kept enabled (int)",
-    "maxEmotesPerUser": "how many emotes a single user can have active at a time (int)"
+    "maxEmotesPerUser": "how many emotes a single user can have active at a time (int)",
+    "messages": {
+        "emoteAdd_success": "Message to be sent when emote is added successfully. {0} will be substituted with the emote id. {1} will be substituted with the emote name.",
+        "emoteAdd_notfound": "Message to be sent when the requested emote could not be found on 7TV. {0} will be substituted with the emote id. {1} will be substituted with the emote name.",
+        "emoteAdd_private": "Message to be sent when the requested emote is not public. {0} will be substituted with the emote id. {1} will be substituted with the emote name.",
+        "emoteAdd_present": "Message to be sent when the requested emote already exists in the set. {0} will be substituted with the emote id. {1} will be substituted with the emote name.",
+        "request_accepted": "Message to be sent when the bot has accepted a request. {0} will be substituted with the username of the requestor.",
+        "request_present": "Message to be sent when the user already has the maximal amount of emotes. {0} will be substituted with the username of the requestor.",
+        "request_banned": "Message to be sent when the user is banned from adding emotes. {0} will be substituted with the username of the requestor."
+    }
 }
