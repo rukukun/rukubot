@@ -63,10 +63,12 @@ async function handleRedeem(channel, user, message) {
     var id = "";
 
     // Define a regular expression to match full or partial URLs
-    const regex = /7tv\.app\/emotes\/([a-f0-9]{24})/;
+    const regex = /(?:https?:\/\/)?7tv\.app\/emotes\/([a-zA-Z0-9]+)/;
 
     // Check if the message matches the regex
     const match = message.match(regex);
+
+    console.log(match)
 
     if (match) {
         id = match[1];
