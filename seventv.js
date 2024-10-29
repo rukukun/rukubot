@@ -74,7 +74,7 @@ export class seventv {
                 {
                     maxRedirects: 0,
                     validateStatus: function (status) {
-                        return status == 302;
+                        return status == 302 || status == 303;
                     }
                 });
             const csrf = this.#getCookieValue(preStageOneResponse.headers['set-cookie'], this.#CSRF_COOKIE_NAME);
@@ -93,7 +93,7 @@ export class seventv {
                 headers: { Cookie: `${this.#CSRF_COOKIE_NAME}=${csrf}` },
                 maxRedirects: 0,
                 validateStatus: function (status) {
-                    return status == 302;
+                    return status == 302 || status == 303;
                 }
             });
 
