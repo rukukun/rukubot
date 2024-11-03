@@ -93,7 +93,7 @@ async function handleRedeem(channel, user, message) {
     switch (enableResponse.code) {
         case 0:
             say(messages.emoteAdd_success);
-            await database.writeDatabase(user, id, emoteSetId);
+            await database.writeDatabase(user, id, emoteSetId, enableResponse.name);
             console.log("Emote added");
             return true;
         case 1:
@@ -205,7 +205,7 @@ async function checkAndRemoveEmotes() {
 
         console.log("Disabling expired emotes..");
         for (const emote of expiredEmotes) {
-            if (await seventv.disableEmote(emote.emoteId, emote.emoteSetId)) uuids.push(emote.id);
+            if (await seventv.disableEmote(emote.emoteId, emote.emoteSetId, emote.emoteName)) uuids.push(emote.id);
         }
 
         if (uuids.length > 0) {
@@ -256,7 +256,7 @@ async function purgeUser(user) {
             console.log("Error disabling emotes.. Cannot get emote set.");
             return false;
         }
-        if (!await seventv.disableEmote(emote.emoteId, emote.emoteSetId)) {
+        if (!await seventv.disableEmote(emote.emoteId, emote.emoteSetId, emote.emoteName)) {
             error = true;
             break;
         }

@@ -234,6 +234,8 @@ export class seventv {
         });
         if(!emoteModifyTest) return false;
         console.log(emoteModifyTest);
+        if(emoteModifyTest.data.errors)
+            console.log(emoteModifyTest.data.errors);
         return true;
     }
 
@@ -335,9 +337,10 @@ export class seventv {
      * Remove emote with the given id from the given emote set
      * @param {string} id 
      * @param {string} emoteSetId 
+     * @param {string} emoteName
      * @returns {boolean}
      */
-    static async disableEmote(id, emoteSetId) {
+    static async disableEmote(id, emoteSetId, emoteName) {
         console.log("Getting bearer token..")
         this.#bearerToken = await this.#getAuth(this.#bearerToken);
 
@@ -346,7 +349,7 @@ export class seventv {
             return false;
         }
 
-        if (!await this.#sendEmoteQuery(this.#bearerToken, emoteSetId, id, "REMOVE", "")) return false;
+        if (!await this.#sendEmoteQuery(this.#bearerToken, emoteSetId, id, "REMOVE", emoteName)) return false;
 
         console.log("Removed emote with id " + id);
         return true;
