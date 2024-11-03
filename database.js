@@ -40,12 +40,13 @@ export class database {
      * @param {string} requester The username of the person that requested the emote
      * @param {string} emoteId The ID of the emote that was requested
      */
-    static async writeDatabase(requester, emoteId) {
+    static async writeDatabase(requester, emoteId, emoteSetId) {
         const expire = moment().add(this.#lifetime, "s");
         const newEntry = {
             id: crypto.randomUUID(),
             requester: requester,
             emoteId: emoteId,
+            emoteSetId: emoteSetId,
             expire: expire.toDate()
         }
         console.log(newEntry);

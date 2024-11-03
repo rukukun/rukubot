@@ -9,6 +9,7 @@ export class seventv {
     static #GQL_ROUTE = 'https://7tv.io/v3/gql';
     static #CHECK_EMOTE_ROUTE = 'https://7tv.io/v3/emotes/';
     static #GET_EMOTE_SET_ROUTE = 'https://7tv.io/v3/emote-sets/'
+    static #GET_USER_ROUTE = 'https://7tv.io/v3/users/'
 
     // Cached 7TV bearer token
     static #bearerToken;
@@ -26,6 +27,19 @@ export class seventv {
         const cookies = setCookieHeader.map(cookieStr => cookie.parse(cookieStr));
         const foundCookie = cookies.find(c => c[cookieName]);
         return foundCookie ? foundCookie[cookieName] : null;
+    }
+
+    static async getEmoteSetId(userID)
+    {
+        try {
+            const userData = await axios.get(`${this.#GET_USER_ROUTE}${userID}`).catch(function (error) {
+                console.log(error);
+            });
+            return userData.data.connections[0].emote_set_id;
+        } catch (error) {
+            console.log(error);
+            return null;
+        }
     }
 
     /**

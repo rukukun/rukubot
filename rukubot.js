@@ -16,8 +16,8 @@ const channelName = config.get('channel');
 //The ID of the target point reward
 const targetRewardId = config.get('rewardId');
 
-//The ID of the target emote set to modify
-const emoteSetid = config.get('emoteSetId');
+//The SevenTV user ID of the target channel
+const stvUserId = config.get('sevenTVUserId');
 
 //Emote lifetime, how long emotes should remain active before getting removed
 const emoteLifetime = config.get('emoteLifetime');
@@ -76,7 +76,14 @@ async function handleRedeem(channel, user, message) {
         id = message;
     }
 
-    var enableResponse = await seventv.enableEmote(id, emoteSetid);
+    var emoteSetId = await seventv.getEmoteSetId(stvUserId)
+    if(emoteSetId == null)
+    {
+        say("Oops.. something went wrong.. (5)")
+        return false;
+    }
+
+    var enableResponse = await seventv.enableEmote(id, emoteSetId);
     console.log(enableResponse);
 
     function say(msg) {
@@ -86,7 +93,7 @@ async function handleRedeem(channel, user, message) {
     switch (enableResponse.code) {
         case 0:
             say(messages.emoteAdd_success);
-            await database.writeDatabase(user, id);
+            await database.writeDatabase(user, id, emoteSetId);
             console.log("Emote added");
             return true;
         case 1:
@@ -141,7 +148,7 @@ async function fulfillRedemption(request) {
         return true;
     } else {
         console.log("Could not fulfill redemption");
-        client.say(request.channel, `Failed to fulfill redemption for @${curRequest.user} `)
+        say(`Failed to fulfill redemption for @${request.user} `)
         return false;
     }
 }
@@ -198,7 +205,7 @@ async function checkAndRemoveEmotes() {
 
         console.log("Disabling expired emotes..");
         for (const emote of expiredEmotes) {
-            if (await seventv.disableEmote(emote.emoteId, emoteSetid)) uuids.push(emote.id);
+            if (await seventv.disableEmote(emote.emoteId, emote.emoteSetId)) uuids.push(emote.id);
         }
 
         if (uuids.length > 0) {
@@ -243,7 +250,13 @@ function parseCommand(message) {
 async function purgeUser(user) {
     var error = false;
     for (const emote of database.getUserEmotes(user)) {
-        if (!await seventv.disableEmote(emote.emoteId, emoteSetid)) {
+        var emoteSetId = await seventv.getEmoteSetId(stvUserId)
+        if(emoteSetId == null)
+        {
+            console.log("Error disabling emotes.. Cannot get emote set.");
+            return false;
+        }
+        if (!await seventv.disableEmote(emote.emoteId, emote.emoteSetId)) {
             error = true;
             break;
         }
@@ -371,7 +384,6 @@ await client.connect();
 client.on('message', (channel, context, message, self) => {
     const rewardId = context["custom-reward-id"]
     if (rewardId == targetRewardId) {
-        console.log(context);
         database.generateRequest(channel, context["display-name"], message);
     } else if (context.mod || context.username == channelName) {
         const command = parseCommand(message);
