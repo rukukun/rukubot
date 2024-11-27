@@ -274,7 +274,6 @@ export class seventv {
         }
 
         if (checkEmoteResponse.data.listed == false) {
-            result.code = 2;
             return this.#checkEmoteResult(2, checkEmoteResponse.data.name, "The given emote ID is not listed");
         }
 
