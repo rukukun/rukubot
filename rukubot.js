@@ -148,7 +148,7 @@ async function fulfillRedemption(request) {
         return true;
     } else {
         console.log("Could not fulfill redemption");
-        say(`Failed to fulfill redemption for @${request.user} `)
+        client.say(request.channel, `Failed to fulfill redemption for @${request.user} `)
         return false;
     }
 }
@@ -249,7 +249,8 @@ function parseCommand(message) {
  */
 async function purgeUser(user) {
     var error = false;
-    for (const emote of database.getUserEmotes(user)) {
+    var userEmotes = await database.getUserEmotes(user);
+    for (const emote of userEmotes) {
         var emoteSetId = await seventv.getEmoteSetId(stvUserId)
         if(emoteSetId == null)
         {
@@ -380,6 +381,11 @@ const client = new tmi.Client({
 });
 
 await client.connect();
+
+async function TestLogin()
+{
+    seventv.TestAuth();
+}
 
 client.on('message', (channel, context, message, self) => {
     const rewardId = context["custom-reward-id"]

@@ -2,10 +2,8 @@ import cookie from 'cookie'
 import axios from 'axios'
 
 export class seventv {
-
-    static #AUTH_COOKIE_NAME = 'seventv-auth';
-    static #CSRF_COOKIE_NAME = 'seventv-csrf';
-    static #LOGIN_ROUTE = 'https://7tv.io/v3/auth?platform=twitch';
+    static #LOGIN_ROUTE = 'https://api.7tv.app/v4/auth/login?platform=twitch';
+    static #FINISH_ROUTE = 'https://api.7tv.app/v4/auth/login/finish'
     static #GQL_ROUTE = 'https://7tv.io/v3/gql';
     static #CHECK_EMOTE_ROUTE = 'https://7tv.io/v3/emotes/';
     static #GET_EMOTE_SET_ROUTE = 'https://7tv.io/v3/emote-sets/'
@@ -91,40 +89,38 @@ export class seventv {
                         return status == 302 || status == 303;
                     }
                 });
-            const csrf = this.#getCookieValue(preStageOneResponse.headers['set-cookie'], this.#CSRF_COOKIE_NAME);
 
             // Step 2: Follow the Twitch login redirect
             const stageOneLocation = preStageOneResponse.headers['location'];
             const stageTwoResponse = await axios.get(stageOneLocation, {
                 headers: { Cookie: `auth-token:${process.env.TWITCH_7TV_EDITOR_TOKEN};persistent=${process.env.TWITCH_7TV_EDITOR_PERSISTENT_COOKIE}` },
+                maxRedirects: 0
             });
 
-            // Step 3: Parse and follow redirect URL
-            var stageThreeUrl = stageTwoResponse.data.match(/URL='([^']+)'/)[1];
-            stageThreeUrl = stageThreeUrl.replaceAll("&amp;", "&");
+            console.log(stageTwoResponse);
 
-            const stageThreeResponse = await axios.get(stageThreeUrl, {
-                headers: { Cookie: `${this.#CSRF_COOKIE_NAME}=${csrf}` },
-                maxRedirects: 0,
-                validateStatus: function (status) {
-                    return status == 302 || status == 303;
-                }
+
+            // Step 3: Parse and follow redirect URL
+            var stageThreeRedirectUrl = stageTwoResponse.data.match(/URL='([^']+)'/)[1];
+            stageThreeRedirectUrl = stageThreeRedirectUrl.replaceAll("&amp;", "&");
+
+            var authCode = stageThreeRedirectUrl.match(/code=([^']+)&/)[1]
+            console.log(authCode)
+
+            const stageThreeResponse = await axios.post(this.#FINISH_ROUTE , {
+                platform: "twitch",
+                code: authCode
             });
 
             // Step 4: Get new authorization token
-            const authCookie = this.#getCookieValue(stageThreeResponse.headers['set-cookie'], this.#AUTH_COOKIE_NAME);
+            const newBearerToken = stageThreeResponse.data?.token;
 
-            if (!authCookie) {
-                console.error('Failed to get cookie');
-                return;
-            }
-
-            console.log('New Bearer Token:', authCookie);
+            console.log('New Bearer Token:', newBearerToken);
 
             // Optionally check the new token
-            if (await this.#checkAuth(authCookie)) {
+            if (await this.#checkAuth(newBearerToken)) {
                 console.log('Token successfully updated');
-                return authCookie;
+                return newBearerToken;
             }
 
             console.error('Failed to verify new token');
