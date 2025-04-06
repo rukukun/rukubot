@@ -81,6 +81,13 @@ export class seventv {
                 return token;
             }
             console.log('Generating new token');
+
+            if (await this.#checkAuth(process.env.SEVENTV_BEARER_TOKEN)) {
+                console.log('Token successfully updated');
+                return process.env.SEVENTV_BEARER_TOKEN;
+            }
+
+            return null;
             // Step 1: Initial login request
             const preStageOneResponse = await axios.get(this.#LOGIN_ROUTE,
                 {
